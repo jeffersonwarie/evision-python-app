@@ -1,9 +1,9 @@
 import streamlit as st
 from PIL import Image
-from influenza.model import fetch_data, influenza_train_and_predict
+from .model import fetch_data, influenza_train_and_predict
 import plotly.graph_objects as go
 import pandas as pd
-from influenza.constants import STATE_CODE_MAPPER
+from .constants import STATE_CODE_MAPPER
 
 
 INFLUENZA = "Influenza"
@@ -42,9 +42,9 @@ if not predict:
 
 
 with st.sidebar:
-    scu = Image.open("evision/media/scu-icon.png")
-    epiclab = Image.open("evision/media/EpicLab-icon.png")
-    cepheid = Image.open("evision/media/cepheid.png")
+    scu = Image.open("/media/scu-icon.png")
+    epiclab = Image.open("/media/EpicLab-icon.png")
+    cepheid = Image.open("/media/cepheid.png")
     st.image(scu)
     with st.container():
         col1, col2 = st.columns(2)

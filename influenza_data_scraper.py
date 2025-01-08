@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 import os
 from zipfile import ZipFile
-from ..constants import (
+from .constants import (
     INFLUENZA_DATA_DIR,
     TRENDS_KEYWORDS,
     STATE_CODE_MAPPER,

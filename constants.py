@@ -1,14 +1,11 @@
 from decouple import config
 import os
 
-PROJECT_ROOT = config("PROJECT_ROOT", default=os.environ.get("PROJECT_ROOT"))
-INFLUENZA_DATA_DIR = os.path.join(
-    PROJECT_ROOT, "evision", "influenza", "data"
-)  # where all the datasets related to influenza should reside
-ILINET_NATIONAL_CSV = os.path.join(INFLUENZA_DATA_DIR, "ILINet-National.csv")
-ILINET_STATE_CSV = os.path.join(INFLUENZA_DATA_DIR, "ILINet-State.csv")
-TRENDS_NATIONAL_CSV = os.path.join(INFLUENZA_DATA_DIR, "google_trends-National.csv")
-TRENDS_STATE_CSV = os.path.join(INFLUENZA_DATA_DIR, "google_trends-State.csv")
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ILINET_NATIONAL_CSV = os.path.join(CURRENT_DIR, "ILINet-National.csv")
+ILINET_STATE_CSV = os.path.join(CURRENT_DIR, "ILINet-State.csv")
+TRENDS_NATIONAL_CSV = os.path.join(CURRENT_DIR, "google_trends-National.csv")
+TRENDS_STATE_CSV = os.path.join(CURRENT_DIR, "google_trends-State.csv")
 TRENDS_KEYWORDS = ["cough", "flu", "tamiflu", "sore throat"]
 
 STATE_CODE_MAPPER = {
