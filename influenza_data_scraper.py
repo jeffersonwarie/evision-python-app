@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 from zipfile import ZipFile
 from constants import (
-    INFLUENZA_DATA_DIR,
+    CURRENT_DIR,
     TRENDS_KEYWORDS,
     STATE_CODE_MAPPER,
 )
@@ -21,7 +21,7 @@ end_id = current_year - 2022 + year_2022_id
 start_id = end_id - 7
 
 
-def cdc_ilinet_downloader(download_dir: str = INFLUENZA_DATA_DIR):
+def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
     """
     Downloads ilinet data for states and national level.
     Specify the absolute dir where you want to download the files.

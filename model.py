@@ -21,7 +21,7 @@ import streamlit as st
 
 logging = setup_logger(__name__)
 
-DATA_DIR = str(Path("evision/influenza/data").resolve())
+DATA_DIR = str(Path("/").resolve())
 
 
 def smape(a, f):
