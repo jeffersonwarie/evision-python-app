@@ -42,9 +42,9 @@ if not predict:
 
 
 with st.sidebar:
-    scu = Image.open("/media/scu-icon.png")
-    epiclab = Image.open("/media/EpicLab-icon.png")
-    cepheid = Image.open("/media/cepheid.png")
+    scu = Image.open("scu-icon.png")
+    epiclab = Image.open("EpicLab-icon.png")
+    cepheid = Image.open("cepheid.png")
     st.image(scu)
     with st.container():
         col1, col2 = st.columns(2)
