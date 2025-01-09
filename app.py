@@ -30,7 +30,7 @@ if not predict:
         )
 
         col1, col2, col3 = st.columns(3)
-        model_image = Image.open("evision/media/model.png")
+        model_image = Image.open("/media/model.png")
         with col1:
             st.write(" ")
 
