@@ -1,9 +1,9 @@
 import streamlit as st
 from PIL import Image
-from .model import fetch_data, influenza_train_and_predict
+from model import fetch_data, influenza_train_and_predict
 import plotly.graph_objects as go
 import pandas as pd
-from .constants import STATE_CODE_MAPPER
+from constants import STATE_CODE_MAPPER
 
 
 INFLUENZA = "Influenza"

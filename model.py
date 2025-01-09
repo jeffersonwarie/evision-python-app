@@ -2,14 +2,14 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 import pandas as pd
-from .constants import (
+from constants import (
     TRENDS_NATIONAL_CSV,
     TRENDS_STATE_CSV,
     ILINET_NATIONAL_CSV,
     ILINET_STATE_CSV,
 )
 from pathlib import Path
-from .app_logger import setup_logger
+from app_logger import setup_logger
 from typing import Dict, Any, List
 import pandas as pd
 # import psycopg2 as pg
