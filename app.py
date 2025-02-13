@@ -73,13 +73,16 @@ with st.sidebar:
     scu = Image.open("scu-icon.png")
     epiclab = Image.open("EpicLab-icon.png")
     cepheid = Image.open("cepheid.png")
-    st.image(scu)
+    
     with st.container():
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.image(cepheid)
+            st.image(scu)
         with col2:
+            st.image(cepheid)
+        with col3:
             st.image(epiclab)
+            
     st.header("eVision")
     disease = st.selectbox(
         "**Pick disease**",
