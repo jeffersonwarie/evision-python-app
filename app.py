@@ -1,4 +1,10 @@
 import streamlit as st
+st.set_page_config(
+    page_title="eVision",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 from PIL import Image
 from model import fetch_data, influenza_train_and_predict
 import plotly.graph_objects as go
@@ -7,13 +13,6 @@ from constants import STATE_CODE_MAPPER
 import threading
 import time
 import requests
-
-st.set_page_config(
-    page_title="eVision",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 st.markdown("""
     <style>
