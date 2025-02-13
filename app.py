@@ -1,10 +1,4 @@
 import streamlit as st
-st.set_page_config(
-    page_title="eVision",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 from PIL import Image
 from model import fetch_data, influenza_train_and_predict
 import plotly.graph_objects as go
@@ -13,54 +7,6 @@ from constants import STATE_CODE_MAPPER
 import threading
 import time
 import requests
-
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    
-    /* Style for results container */
-    .results-container {
-        background-color: #e0e2e6;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* Improve contrast for metrics */
-    .stMetric {
-        background-color: white !important;
-        padding: 1rem !important;
-        border-radius: 5px !important;
-    }
-    
-    /* Style sidebar */
-    .css-1d391kg {
-        background-color: #e0e2e6;
-    }
-    
-    /* Style buttons */
-    .stButton > button {
-        background-color: #FF4B4B;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
-    }
-    
-    .stButton > button:hover {
-        background-color: #FF3333;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-st.set_page_config(
-    page_title="eVision",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 class KeepAlive:
     def __init__(self):
@@ -74,7 +20,7 @@ class KeepAlive:
                 requests.get("https://evision-python-app-gp4lssjsvbwz53dlnsem6m.streamlit.app/")
             except:
                 pass
-            time.sleep(60 * 5)  # Sleep for 5 minutes
+            time.sleep(60 * 10)  # Sleep for 10 minutes
 
     def start(self):
         if not self.running:
@@ -89,6 +35,13 @@ if 'keep_alive' not in st.session_state:
     st.session_state.keep_alive.start()
 
 INFLUENZA = "Influenza"
+
+st.set_page_config(
+    page_title="eVision",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 placeholder = st.empty()
 predict = False
@@ -120,16 +73,13 @@ with st.sidebar:
     scu = Image.open("scu-icon.png")
     epiclab = Image.open("EpicLab-icon.png")
     cepheid = Image.open("cepheid.png")
-    
+    st.image(scu)
     with st.container():
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            st.image(scu, use_column_width=True)
+            st.image(cepheid)
         with col2:
-            st.image(cepheid, use_column_width=True)
-        with col3:
-            st.image(epiclab, use_column_width=True)
-            
+            st.image(epiclab)
     st.header("eVision")
     disease = st.selectbox(
         "**Pick disease**",
@@ -186,7 +136,6 @@ if disease == INFLUENZA:
             response = influenza_train_and_predict(df, epochs, num_weeks)
 
         if response:
-            st.markdown('<div class="results-container">', unsafe_allow_html=True)
             st.header(f"{disease} Prediction results")
 
             ci = response.get("confidence_interval")
@@ -277,8 +226,6 @@ if disease == INFLUENZA:
                 title_x=0.5,
             )
             st.plotly_chart(fig, theme=None, use_container_width=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
 
 
 
