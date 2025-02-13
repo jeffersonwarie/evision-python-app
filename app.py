@@ -8,6 +8,13 @@ import threading
 import time
 import requests
 
+st.set_page_config(
+    page_title="eVision",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 st.markdown("""
     <style>
     .stApp {
@@ -83,13 +90,6 @@ if 'keep_alive' not in st.session_state:
     st.session_state.keep_alive.start()
 
 INFLUENZA = "Influenza"
-
-st.set_page_config(
-    page_title="eVision",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 placeholder = st.empty()
 predict = False
