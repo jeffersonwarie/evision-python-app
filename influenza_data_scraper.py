@@ -3,7 +3,6 @@ from datetime import datetime
 import os
 from zipfile import ZipFile
 from constants import (
-    CURRENT_DIR,
     TRENDS_KEYWORDS,
     STATE_CODE_MAPPER,
 )
@@ -12,20 +11,28 @@ import pandas as pd
 import os
 import time
 from random import randint
+from random import uniform
+from typing import Optional
+import backoff
+
+DOWNLOAD_DIR = '/home/epidjhmw/public_html/pydata'
 
 current_year = int(datetime.now().strftime("%Y"))
-year_2022_id = (
-    62  # the ID for year 2022 is 62 on CDC. We need ID to fetch data based on year
-)
+year_2022_id = 62  # the ID for year 2022 is 62 on CDC
 end_id = current_year - 2022 + year_2022_id
 start_id = end_id - 7
 
+def ensure_download_dir():
+    """Create download directory if it doesn't exist"""
+    if not os.path.exists(DOWNLOAD_DIR):
+        os.makedirs(DOWNLOAD_DIR)
 
-def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
+def cdc_ilinet_downloader():
     """
     Downloads ilinet data for states and national level.
     Specify the absolute dir where you want to download the files.
     """
+    ensure_download_dir()
     print(
         f"Beginning downloading CDC ILINet data for National Level. Following are the start and end SeasonsDT params {start_id}-{end_id}"
     )
@@ -113,7 +120,7 @@ def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
         print("Failed to download national data")
         raise ex
 
-    download_file_path = os.path.join(download_dir, "ILINET-National.zip")
+    download_file_path = os.path.join(DOWNLOAD_DIR, "ILINET-National.zip")
     print(
         f"[INFO]: Finished downloading ILINET National data. Extracting it in {download_file_path}"
     )
@@ -121,14 +128,14 @@ def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
     with open(download_file_path, "wb") as f:
         f.write(resp.content)
 
-    # extracting only ILINet.csv in the download_dir
+    # extracting only ILINet.csv in the DOWNLOAD_DIR
     with ZipFile(download_file_path, "r") as zip_ref:
-        zip_ref.extract("ILINet.csv", download_dir)
+        zip_ref.extract("ILINet.csv", DOWNLOAD_DIR)
 
     # renaming the CSV
     os.rename(
-        os.path.join(download_dir, "ILINet.csv"),
-        os.path.join(download_dir, "ILINet-National.csv"),
+        os.path.join(DOWNLOAD_DIR, "ILINet.csv"),
+        os.path.join(DOWNLOAD_DIR, "ILINet-National.csv"),
     )
     os.remove(download_file_path)
 
@@ -140,7 +147,7 @@ def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
         print("Failed to download state data")
         raise ex
 
-    download_file_path = os.path.join(download_dir, "ILINET-State.zip")
+    download_file_path = os.path.join(DOWNLOAD_DIR, "ILINET-State.zip")
     print(
         f"[INFO]: Finished downloading ILINET State data. Extracting it in {download_file_path}"
     )
@@ -148,87 +155,149 @@ def cdc_ilinet_downloader(download_dir: str = CURRENT_DIR):
     with open(download_file_path, "wb") as f:
         f.write(resp.content)
 
-    # extracting only ILINet.csv in the download_dir
+    # extracting only ILINet.csv in the DOWNLOAD_DIR
     with ZipFile(download_file_path, "r") as zip_ref:
-        zip_ref.extract("ILINet.csv", download_dir)
+        zip_ref.extract("ILINet.csv", DOWNLOAD_DIR)
 
     # renaming the CSV
     os.rename(
-        os.path.join(download_dir, "ILINet.csv"),
-        os.path.join(download_dir, "ILINet-State.csv"),
+        os.path.join(DOWNLOAD_DIR, "ILINet.csv"),
+        os.path.join(DOWNLOAD_DIR, "ILINet-State.csv"),
     )
     os.remove(download_file_path)
 
+def backoff_hdlr(details):
+    """Handler for backoff decorator to log retries"""
+    with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+        f.write(f"Backing off {details['wait']:0.1f} seconds after {details['tries']} tries\n")
 
-def trends_scraper(download_dir: str = INFLUENZA_DATA_DIR) -> None:
+@backoff.on_exception(
+    backoff.expo,
+    Exception,
+    max_tries=5,
+    max_time=300,
+    on_backoff=backoff_hdlr
+)
+def fetch_trends_with_retry(pytrends: TrendReq, term: str, timeframe: str, geo: str) -> Optional[pd.DataFrame]:
+    """Fetch Google Trends data with retry logic"""
+    try:
+        # Random delay between 2 and 5 seconds
+        time.sleep(uniform(2, 5))
+        pytrends.build_payload(kw_list=[term], timeframe=timeframe, geo=geo)
+        # Additional delay after building payload
+        time.sleep(uniform(1, 3))
+        df = pytrends.interest_over_time()
+        if df is None or df.empty:
+            raise Exception("Empty response from Google Trends")
+            
+        # Handle the pandas warning by explicitly managing data types
+        df = df.reset_index().drop(columns="isPartial")
+        df = df.infer_objects()  # Properly infer data types
+        return df
+    except Exception as e:
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write(f"Error fetching trends for {term} in {geo}: {str(e)}\n")
+        raise
+
+def trends_scraper() -> None:
+    """Scrapes Google Trends data with improved rate limiting handling"""
     terms = TRENDS_KEYWORDS
     timeframe = "today 5-y"
-    ggl_complete: pd.DataFrame = None
-    pytrends = TrendReq(hl="en-US", tz=360)
+    pytrends = TrendReq(hl="en-US", tz=360)  # Remove retry parameters as they're causing issues
 
-    # first we'll scrape national data
-    # area = "US"
-    # print(f"[INFO] Beginning trends scraping with {terms}, {area}, {timeframe}")
-    # for term in terms:
-    #     pytrends.build_payload(kw_list= [term], timeframe = timeframe, geo = area)
-    #     ggl = pytrends.interest_over_time()
-    #     ggl = ggl.reset_index().drop(columns="isPartial")
-    #     if ggl_complete is None:
-    #         ggl_complete = ggl.copy(deep=True)
-    #     else:
-    #         ggl_complete = ggl_complete.merge(ggl, on="date")
-    #     time.sleep(2)
+    # First scrape national data
+    with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+        f.write("Beginning national trends scraping\n")
 
-    # ggl_complete['week_number'] = ggl_complete['date'].dt.strftime('%U').astype(int)
-    # ggl_complete['year'] = ggl_complete['date'].dt.strftime('%Y').astype(int)
+    national_df = None
+    for term in terms:
+        try:
+            column_df = fetch_trends_with_retry(pytrends, term, timeframe, "US")
+            
+            if national_df is None:
+                national_df = column_df.copy(deep=True)
+            else:
+                national_df = national_df.merge(column_df, on="date")
+            
+            with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+                f.write(f"Successfully fetched national data for {term}\n")
+            
+        except Exception as e:
+            with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+                f.write(f"Failed to fetch national data for {term}: {str(e)}\n")
+            continue
 
-    # ggl_complete.to_csv(os.path.join(download_dir, 'google_trends-National.csv'), index=False)
-    # print(f"[INFO] Data successfully scraped and saved to {download_dir}.\nData shape: {ggl_complete.shape}")
+    if national_df is not None and not national_df.empty:
+        national_df["week_number"] = national_df["date"].dt.strftime("%U").astype(int)
+        national_df["year"] = national_df["date"].dt.strftime("%Y").astype(int)
+        
+        output_file = os.path.join(DOWNLOAD_DIR, "google_trends-National.csv")
+        national_df.to_csv(output_file, index=False)
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write(f"National data successfully saved to {output_file}. Shape: {national_df.shape}\n")
+    else:
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write("No national data was collected successfully\n")
 
+    # Now scrape state-level data
     complete_df = None
-    # now we'll scrape state wise data
     for state_name, state_code in STATE_CODE_MAPPER.items():
-        print(
-            f"[INFO] Beginning trends scraping with {terms}, {state_code}, {timeframe}"
-        )
-        # first making a df of all the terms of one state
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write(f"Processing state: {state_name} ({state_code})\n")
+
         state_df = None
         for term in terms:
-            pytrends.build_payload(kw_list=[term], timeframe=timeframe, geo=state_code)
-            column_df = pytrends.interest_over_time()
-            column_df = column_df.reset_index().drop(columns="isPartial")
-            if state_df is None:
-                state_df = column_df.copy(deep=True)
+            try:
+                column_df = fetch_trends_with_retry(pytrends, term, timeframe, state_code)
+                
+                if state_df is None:
+                    state_df = column_df.copy(deep=True)
+                else:
+                    state_df = state_df.merge(column_df, on="date")
+                
+                with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+                    f.write(f"Successfully fetched data for {term} in {state_name}\n")
+                
+            except Exception as e:
+                with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+                    f.write(f"Failed to fetch {term} for {state_name}: {str(e)}\n")
+                continue
+
+        if state_df is not None:
+            state_df["state"] = state_name
+            state_df["state_code"] = state_code
+            if complete_df is None:
+                complete_df = state_df.copy(deep=True)
             else:
-                state_df = state_df.merge(column_df, on="date")
-            time.sleep(randint(1, 5))
+                complete_df = pd.concat([complete_df, state_df])
 
-        # then appending the state df to complete df
-        state_df["state"] = state_name
-        state_df["state_code"] = state_code
-        if complete_df is None:
-            complete_df = state_df.copy(deep=True)
-        else:
-            complete_df = pd.concat([complete_df, state_df])
+    if complete_df is not None and not complete_df.empty:
+        complete_df["week_number"] = complete_df["date"].dt.strftime("%U").astype(int)
+        complete_df["year"] = complete_df["date"].dt.strftime("%Y").astype(int)
+        
+        output_file = os.path.join(DOWNLOAD_DIR, "google_trends-State.csv")
+        complete_df.to_csv(output_file, index=False)
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write(f"State data successfully saved to {output_file}. Shape: {complete_df.shape}\n")
+    else:
+        with open(os.path.join(DOWNLOAD_DIR, 'scraper_log.txt'), 'a') as f:
+            f.write("No state data was collected successfully\n")
 
-    complete_df["week_number"] = complete_df["date"].dt.strftime("%U").astype(int)
-    complete_df["year"] = complete_df["date"].dt.strftime("%Y").astype(int)
-
-    complete_df.to_csv(
-        os.path.join(download_dir, "google_trends-State.csv"), index=False
-    )
-    print(
-        f"[INFO] Data successfully scraped and saved to {download_dir}.\nData shape: {complete_df.shape}"
-    )
-
-
-def scrape_cdc_trends_data(data_dir: str = INFLUENZA_DATA_DIR) -> None:
-    if not os.path.exists(INFLUENZA_DATA_DIR):
-        os.mkdir(INFLUENZA_DATA_DIR)
-
+def scrape_cdc_trends_data():
+    ensure_download_dir()
     cdc_ilinet_downloader()
     trends_scraper()
 
-
 if __name__ == "__main__":
-    scrape_cdc_trends_data()
+    # logging for cron debugging
+    log_file = os.path.join(DOWNLOAD_DIR, 'scraper_log.txt')
+    try:
+        with open(log_file, 'a') as f:
+            f.write(f"\n=== Script started at {datetime.now()} ===\n")
+        scrape_cdc_trends_data()
+        with open(log_file, 'a') as f:
+            f.write(f"Script completed successfully at {datetime.now()}\n")
+    except Exception as e:
+        with open(log_file, 'a') as f:
+            f.write(f"Error occurred at {datetime.now()}: {str(e)}\n")
+        raise

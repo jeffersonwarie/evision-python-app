@@ -2,109 +2,78 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 import pandas as pd
-from constants import (
-    TRENDS_NATIONAL_CSV,
-    TRENDS_STATE_CSV,
-    ILINET_NATIONAL_CSV,
-    ILINET_STATE_CSV,
-)
-from pathlib import Path
 from app_logger import setup_logger
 from typing import Dict, Any, List
-import pandas as pd
-# import psycopg2 as pg
-from sqlalchemy import create_engine
-from decouple import config
-import os
 import streamlit as st
-
+import requests
+from io import StringIO
 
 logging = setup_logger(__name__)
 
-DATA_DIR = str(Path("/").resolve())
+# Base URL for the data files
+BASE_URL = "http://epidemicvision.com/pydata"
 
+# Define the CSV file URLs
+TRENDS_NATIONAL_CSV = f"{BASE_URL}/google_trends-National.csv"
+TRENDS_STATE_CSV = f"{BASE_URL}/google_trends-State.csv"
+ILINET_NATIONAL_CSV = f"{BASE_URL}/ILINet-National.csv"
+ILINET_STATE_CSV = f"{BASE_URL}/ILINet-State.csv"
 
 def smape(a, f):
     return 1 / len(a) * np.sum(2 * np.abs(f - a) / (np.abs(a) + np.abs(f)) * 100)
 
-
-@st.cache_data
-def get_db_engine():
-    engine = pg.connect(config('DB_URL', default=os.environ.get("DB_URL")))
-    return engine
-
-# def fetch_data_from_db(terms: List, level: str, states: str = None) -> pd.DataFrame:
-#     engine = pg.connect(config('DB_URL', default=os.environ.get("DB_URL")))
-#     if level == "National":
-#         trends_df = pd.read_sql("select date, cough, flu, tamiflu, sore_throat, week_number, year from influenza_gtrends WHERE level='National' ORDER BY year DESC, week_number DESC LIMIT 260", con=engine)
-#         ilinet_df = pd.read_sql("select * from influenza_ilinet WHERE region_type='National' ORDER BY year DESC, week DESC LIMIT 260", con=engine)
-#     else:
-#         trends_df = pd.read_sql(f"select date, cough, flu, tamiflu, sore_throat, week_number, year from influenza_gtrends WHERE state='{states}' ORDER BY year DESC, week_number DESC LIMIT 260", con=engine)
-#         ilinet_df = pd.read_sql(f"select * from influenza_ilinet WHERE region='{states}' ORDER BY year DESC, week DESC LIMIT 260", con=engine)
-
-#     ilinet_df.drop(
-#         ilinet_df.loc[ilinet_df["ilitotal"].isnull()].index, axis=0, inplace=True
-#     )
-#     terms.extend(["date", "week_number", "year"])
-#     terms = ['sore_throat' if term == 'sore throat' else term for term in terms]        
-#     trends_df = trends_df[terms]
-#     df = pd.merge(
-#         trends_df,
-#         ilinet_df.loc[:, ["year", "week", "ilitotal"]],
-#         left_on=["year", "week_number"],
-#         right_on=["year", "week"],
-#         how="inner",
-#     ).drop(columns=["week_number", "year", "year", "week"])
-#     logging.info(f"Combined data: {df.shape}")
-#     return df
+def fetch_csv_from_url(url: str, skiprows: List[int] = None, na_values: str = None) -> pd.DataFrame:
+    """Fetch CSV file from URL and return as pandas DataFrame"""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad status codes
+        if skiprows:
+            return pd.read_csv(StringIO(response.text), skiprows=skiprows, na_values=na_values)
+        return pd.read_csv(StringIO(response.text))
+    except requests.RequestException as e:
+        logging.error(f"Error fetching data from {url}: {str(e)}")
+        raise
 
 def fetch_data(terms: List, level: str, states: str = None) -> pd.DataFrame:
     try:
-        # return fetch_data_from_db(terms, level, states)
-        raise Exception("Database connection failed")  # Add a descriptive message
-    except Exception as ex:
-        print("----- failed to fetch from db ------")
-        print(ex)
         return fetch_data_from_csv(terms, level, states)
+    except Exception as ex:
+        logging.error(f"Failed to fetch data: {str(ex)}")
+        raise
 
 def fetch_data_from_csv(terms: List, level: str, states: str = None) -> pd.DataFrame:
-    """
-    Currently the method scrapes the data on demand based
-    on the params; and returns a df.
-    Once we have a db, this method should fetch data from db
-    based on the specified params; and return a df.
-    The call to scrapers would be replaced by calls to db
-    """
-    if level == "National":
-        trends_df = pd.read_csv(TRENDS_NATIONAL_CSV)
-        ilinet_df = pd.read_csv(ILINET_NATIONAL_CSV, skiprows=[0], na_values="X")
-    else:
-        trends_df = pd.read_csv(TRENDS_STATE_CSV)
-        trends_df = trends_df.loc[trends_df["state"] == states, :].drop(
-            columns=["state", "state_code"]
+    """Fetches data from CSV files via HTTP"""
+    try:
+        if level == "National":
+            trends_df = fetch_csv_from_url(TRENDS_NATIONAL_CSV)
+            ilinet_df = fetch_csv_from_url(ILINET_NATIONAL_CSV, skiprows=[0], na_values="X")
+        else:
+            trends_df = fetch_csv_from_url(TRENDS_STATE_CSV)
+            trends_df = trends_df.loc[trends_df["state"] == states, :].drop(
+                columns=["state", "state_code"]
+            )
+            ilinet_df = fetch_csv_from_url(ILINET_STATE_CSV, skiprows=[0], na_values="X")
+            ilinet_df = ilinet_df.loc[ilinet_df["REGION"] == states, :]
+
+        ilinet_df.drop(
+            ilinet_df.loc[ilinet_df["ILITOTAL"].isnull()].index, axis=0, inplace=True
         )
-        ilinet_df = pd.read_csv(ILINET_STATE_CSV, skiprows=[0], na_values="X")
-        ilinet_df = ilinet_df.loc[ilinet_df["REGION"] == states, :]
+        terms.extend(["date", "week_number", "year"])
+        trends_df = trends_df[terms]
+        df = pd.merge(
+            trends_df,
+            ilinet_df.loc[:, ["YEAR", "WEEK", "ILITOTAL"]],
+            left_on=["year", "week_number"],
+            right_on=["YEAR", "WEEK"],
+            how="inner",
+        ).drop(columns=["week_number", "year", "YEAR", "WEEK"])
+        logging.info(f"Combined data: {df.shape}")
+        df = df.rename(columns={'ILITOTAL':'ilitotal'})
+        return df
+    except Exception as e:
+        logging.error(f"Error processing CSV data: {str(e)}")
+        raise
 
-    ilinet_df.drop(
-        ilinet_df.loc[ilinet_df["ILITOTAL"].isnull()].index, axis=0, inplace=True
-    )
-    terms.extend(["date", "week_number", "year"])
-    trends_df = trends_df[terms]
-    df = pd.merge(
-        trends_df,
-        ilinet_df.loc[:, ["YEAR", "WEEK", "ILITOTAL"]],
-        left_on=["year", "week_number"],
-        right_on=["YEAR", "WEEK"],
-        how="inner",
-    ).drop(columns=["week_number", "year", "YEAR", "WEEK"])
-    logging.info(f"Combined data: {df.shape}")
-    df = df.rename(columns={'ILITOTAL':'ilitotal'})
-    return df
-
-
-
-# @st.cache_data
 def influenza_train_and_predict(
     data: pd.DataFrame, epochs: int, predict_ahead_by: int
 ) -> Dict[str, Any]:
@@ -162,15 +131,4 @@ def influenza_train_and_predict(
     )
     response["confidence_interval"] = ci
 
-    # import pickle
-    # with open('response.pkl', 'wb') as file:
-    #     # A new file will be created
-    #     pickle.dump(response, file)
-
     return response
-
-
-# -------------- For testing ---------------
-# df = fetch_data(['flu'], 'National', None)
-# resp = influenza_train_and_predict(df, 2, 3)
-# print(resp.keys())
