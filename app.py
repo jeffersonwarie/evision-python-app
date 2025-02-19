@@ -74,14 +74,24 @@ with st.sidebar:
     epiclab = Image.open("EpicLab-icon.png")
     cepheid = Image.open("cepheid.png")
     
+    scu_height = scu.height
+    epiclab_height = epiclab.height
+    cepheid_height = cepheid.height
+    
+    max_height = max(scu_height, epiclab_height)
+    padding_needed = (max_height - cepheid_height) // 2
+    
     with st.container():
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.image(scu)
+            st.image(scu, use_column_width=True)
         with col2:
-            st.image(cepheid)
+            for _ in range(padding_needed // 10):
+                st.write("")
+            st.image(cepheid, use_column_width=True)
         with col3:
-            st.image(epiclab)
+            st.image(epiclab, use_column_width=True)
+
             
     st.header("eVision")
     disease = st.selectbox(
