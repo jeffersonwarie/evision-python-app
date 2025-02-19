@@ -84,13 +84,13 @@ with st.sidebar:
     with st.container():
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.image(scu, use_column_width=True)
+            st.image(scu, use_container_width=True)
         with col2:
             for _ in range(padding_needed // 10):
                 st.write("")
-            st.image(cepheid, use_column_width=True)
+            st.image(cepheid, use_container_width=True)
         with col3:
-            st.image(epiclab, use_column_width=True)
+            st.image(epiclab, use_container_width=True)
 
             
     st.header("eVision")
