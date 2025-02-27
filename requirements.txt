@@ -1,11 +1,13 @@
 streamlit
 pandas
+keras
 numpy
 scipy
 selenium
 webdriver-manager
 pytrends
 scikit-learn
+tensorflow
 plotly==5.13.1
 python-decouple
 psycopg2-binary
