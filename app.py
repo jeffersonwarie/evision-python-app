@@ -3,6 +3,7 @@ from PIL import Image
 from model import fetch_data, influenza_train_and_predict
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 from constants import STATE_CODE_MAPPER
 import threading
 import time
@@ -213,6 +214,19 @@ if disease == INFLUENZA:
             st.metric(
                 "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
             )
+
+            mae = np.mean(np.abs(df["predictions"] - df["actual_data"]))
+            mse = np.mean(np.square(df["predictions"] - df["actual_data"]))
+            rmse = np.sqrt(mse)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("**MAE**", f"{mae:.5f}", help="Mean Absolute Error")
+            with col2:
+                st.metric("**MSE**", f"{mse:.5f}", help="Mean Squared Error")
+            with col3:
+                st.metric("**RMSE**", f"{rmse:.5f}", help="Root Mean Squared Error")
+
             history = response.get("history")
             # print(history.history["loss"])
 
