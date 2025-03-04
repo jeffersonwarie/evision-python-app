@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 from model import fetch_data, influenza_train_and_predict
+from model import smape
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -215,17 +216,15 @@ if disease == INFLUENZA:
                 "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
             )
 
-            mae = np.mean(np.abs(df["predictions"] - df["actual_data"]))
-            mse = np.mean(np.square(df["predictions"] - df["actual_data"]))
-            rmse = np.sqrt(mse)
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("**MAE**", f"{mae:.5f}", help="Mean Absolute Error")
-            with col2:
-                st.metric("**MSE**", f"{mse:.5f}", help="Mean Squared Error")
-            with col3:
-                st.metric("**RMSE**", f"{rmse:.5f}", help="Root Mean Squared Error")
+            # Calculate SMAPE using the function already defined in model.py
+            smape_value = smape(df["actual_data"].values, df["predictions"].values)
+
+            # Display SMAPE metric
+            st.metric(
+                "**Error**", 
+                f"{smape_value:.5f}", 
+                help="Symmetric Mean Absolute Percentage Error"
+            )
 
             history = response.get("history")
             # print(history.history["loss"])
