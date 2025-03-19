@@ -1,8 +1,10 @@
 import streamlit as st
 from PIL import Image
 from model import fetch_data, influenza_train_and_predict
+from model import smape
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 from constants import STATE_CODE_MAPPER
 import threading
 import time
@@ -73,13 +75,26 @@ with st.sidebar:
     scu = Image.open("scu-icon.png")
     epiclab = Image.open("EpicLab-icon.png")
     cepheid = Image.open("cepheid.png")
-    st.image(scu)
+    
+    scu_height = scu.height
+    epiclab_height = epiclab.height
+    cepheid_height = cepheid.height
+    
+    max_height = max(scu_height, epiclab_height)
+    padding_needed = (max_height - cepheid_height) // 2
+    
     with st.container():
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.image(cepheid)
+            st.image(scu, use_container_width=True)
         with col2:
-            st.image(epiclab)
+            for _ in range(padding_needed // 10):
+                st.write("")
+            st.image(cepheid, use_container_width=True)
+        with col3:
+            st.image(epiclab, use_container_width=True)
+
+            
     st.header("eVision")
     disease = st.selectbox(
         "**Pick disease**",
@@ -200,6 +215,17 @@ if disease == INFLUENZA:
             st.metric(
                 "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
             )
+
+            # Calculate SMAPE using the function already defined in model.py
+            smape_value = smape(df["actual_data"].values, df["predictions"].values)
+
+            # Display SMAPE metric
+            st.metric(
+                "**Error**", 
+                f"{smape_value:.5f}", 
+                help="Symmetric Mean Absolute Percentage Error"
+            )
+
             history = response.get("history")
             # print(history.history["loss"])
 

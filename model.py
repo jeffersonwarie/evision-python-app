@@ -34,6 +34,7 @@ def fetch_csv_from_url(url: str, skiprows: List[int] = None, na_values: str = No
         logging.error(f"Error fetching data from {url}: {str(e)}")
         raise
 
+@st.cache_data(ttl=3600)  # Cache data for 1 hour
 def fetch_data(terms: List, level: str, states: str = None) -> pd.DataFrame:
     try:
         return fetch_data_from_csv(terms, level, states)
@@ -74,9 +75,13 @@ def fetch_data_from_csv(terms: List, level: str, states: str = None) -> pd.DataF
         logging.error(f"Error processing CSV data: {str(e)}")
         raise
 
+@st.cache_resource
 def influenza_train_and_predict(
     data: pd.DataFrame, epochs: int, predict_ahead_by: int
 ) -> Dict[str, Any]:
+    # Create a copy of data to avoid modifying the cached dataframe
+    data = data.copy()
+    
     dates = data["date"].to_list()
     data.drop(columns=["date"], inplace=True)
     data = data.astype(float)

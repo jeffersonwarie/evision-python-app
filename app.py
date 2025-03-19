@@ -36,6 +36,10 @@ if 'keep_alive' not in st.session_state:
     st.session_state.keep_alive = KeepAlive()
     st.session_state.keep_alive.start()
 
+# Initialize session state for cache
+if 'previous_predictions' not in st.session_state:
+    st.session_state.previous_predictions = {}
+
 INFLUENZA = "Influenza"
 
 st.set_page_config(
@@ -136,139 +140,147 @@ with st.sidebar:
             if predict:
                 placeholder.empty()
 
-# data fetching pahse:
-if disease == INFLUENZA:
-    # check if We have all the required values. Only start data fetching after that
+# Create a cache key for data and model predictions
+def create_cache_key(terms, pred_level, states, epochs=None, num_weeks=None):
+    base_key = f"{'-'.join(sorted(terms))}__{pred_level}__{states}"
+    if epochs is not None and num_weeks is not None:
+        return f"{base_key}__{epochs}__{num_weeks}"
+    return base_key
+
+# Data fetching phase - using st.cache_data decorator in model.py
+df = None
+if disease == INFLUENZA and terms:
+    # Check if we have all the required values before fetching data
     with st.spinner("Fetching the data..."):
         df = fetch_data(terms, pred_level, states)
+        # The fetch_data function is now cached with @st.cache_data in model.py
 
-# model prediction phase:
+# Model prediction phase - using both decorator caching and session state caching
 response = None
-if disease == INFLUENZA:
-    if predict:
-        # placeholder.empty()
+if disease == INFLUENZA and predict and df is not None:
+    # Create a unique cache key for this prediction
+    cache_key = create_cache_key(terms, pred_level, states, epochs, num_weeks)
+    
+    # Check if we have this prediction cached in session state
+    if cache_key in st.session_state.previous_predictions:
+        response = st.session_state.previous_predictions[cache_key]
+        st.success("Using cached prediction results")
+    else:
+        # If not in cache, use the cached function (which may still return quickly if parameters match)
         with st.spinner("Training the model..."):
             response = influenza_train_and_predict(df, epochs, num_weeks)
+            
+        # Store in session state cache for future use
+        st.session_state.previous_predictions[cache_key] = response
 
-        if response:
-            st.header(f"{disease} Prediction results")
+    if response:
+        st.header(f"{disease} Prediction results")
 
-            ci = response.get("confidence_interval")
-            df = pd.DataFrame(
-                {
-                    "actual_data": response.get("actual_data"),
-                    "predictions": response.get("predictions"),
-                }
+        ci = response.get("confidence_interval")
+        results_df = pd.DataFrame(
+            {
+                "actual_data": response.get("actual_data"),
+                "predictions": response.get("predictions"),
+            }
+        )
+
+        results_df["week"] = range(1, len(results_df) + 1)
+        results_df["predictions_upper"] = results_df["predictions"] + results_df["predictions"] * 0.01 * ci
+        results_df["predictions_lower"] = results_df["predictions"] - results_df["predictions"] * 0.01 * ci
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Line(name="Actual Data", x=results_df["week"], y=results_df["actual_data"])
+        )
+
+        fig.add_trace(
+            go.Line(
+                name="Predictions",
+                x=results_df["week"],
+                y=results_df["predictions"],
             )
+        )
 
-            df["week"] = range(1, len(df) + 1)
-            df["predictions_upper"] = df["predictions"] + df["predictions"] * 0.01 * ci
-            df["predictions_lower"] = df["predictions"] - df["predictions"] * 0.01 * ci
-            fig = go.Figure()
-
-            fig.add_trace(
-                go.Line(name="Actual Data", x=df["week"], y=df["actual_data"])
+        fig.add_trace(
+            go.Scatter(
+                name="Upper Bound",
+                x=results_df["week"],
+                y=results_df["predictions_upper"],
+                mode="lines",
+                marker=dict(color="#444"),
+                line=dict(width=0),
+                showlegend=False,
             )
-
-            fig.add_trace(
-                go.Line(
-                    name="Predictions",
-                    x=df["week"],
-                    y=df["predictions"],
-                )
+        )
+        fig.add_trace(
+            go.Scatter(
+                name="Lower Bound",
+                x=results_df["week"],
+                y=results_df["predictions_lower"],
+                marker=dict(color="#444"),
+                line=dict(width=0),
+                mode="lines",
+                fillcolor="rgba(68, 0, 0, 0.2)",
+                fill="tonexty",
+                showlegend=False,
             )
+        )
 
-            fig.add_trace(
-                go.Scatter(
-                    name="Upper Bound",
-                    x=df["week"],
-                    y=df["predictions_upper"],
-                    mode="lines",
-                    marker=dict(color="#444"),
-                    line=dict(width=0),
-                    showlegend=False,
-                )
+        fig.update_layout(
+            xaxis={"title": "Number of weeks"},
+            yaxis={"title": "ILI Cases"},  # 'tickformat':'.2e'},
+            title="<b>Influenza</b> Prediction",
+            title_x=0.5,
+        )
+
+        st.plotly_chart(fig, theme=None, use_container_width=True)
+
+        st.metric(
+            "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
+        )
+
+        # Calculate SMAPE using the function already defined in model.py
+        smape_value = smape(results_df["actual_data"].values, results_df["predictions"].values)
+
+        # Display SMAPE metric
+        st.metric(
+            "**Error**", 
+            f"{smape_value:.5f}", 
+            help="Symmetric Mean Absolute Percentage Error"
+        )
+
+        history = response.get("history")
+        # print(history.history["loss"])
+
+        st.header("Epoch-Loss Graph")
+        df_loss = pd.DataFrame(
+            {
+                "loss": history.history["loss"],
+            }
+        )
+
+        df_loss["epoch"] = range(1, epochs + 1)
+        fig = go.Figure()
+        fig.add_trace(
+            go.Line(
+                name="Loss",
+                x=df_loss["epoch"],
+                y=df_loss["loss"],
             )
-            fig.add_trace(
-                go.Scatter(
-                    name="Lower Bound",
-                    x=df["week"],
-                    y=df["predictions_lower"],
-                    marker=dict(color="#444"),
-                    line=dict(width=0),
-                    mode="lines",
-                    fillcolor="rgba(68, 0, 0, 0.2)",
-                    fill="tonexty",
-                    showlegend=False,
-                )
-            )
+        )
+        fig.update_layout(
+            xaxis={"title": "Epoch"},
+            yaxis={"title": "Loss"},  # 'tickformat':'.2e'},
+            title="Epoch</b>VS</b>Loss",
+            title_x=0.5,
+        )
+        st.plotly_chart(fig, theme=None, use_container_width=True)
 
-            fig.update_layout(
-                xaxis={"title": "Number of weeks"},
-                yaxis={"title": "ILI Cases"},  # 'tickformat':'.2e'},
-                title="<b>Influenza</b> Prediction",
-                title_x=0.5,
-            )
-
-            st.plotly_chart(fig, theme=None, use_container_width=True)
-
-            st.metric(
-                "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
-            )
-
-            # Calculate SMAPE using the function already defined in model.py
-            smape_value = smape(df["actual_data"].values, df["predictions"].values)
-
-            # Display SMAPE metric
-            st.metric(
-                "**Error**", 
-                f"{smape_value:.5f}", 
-                help="Symmetric Mean Absolute Percentage Error"
-            )
-
-            history = response.get("history")
-            # print(history.history["loss"])
-
-            st.header("Epoch-Loss Graph")
-            df = pd.DataFrame(
-                {
-                    "loss": history.history["loss"],
-                }
-            )
-
-            df["epoch"] = range(1, epochs + 1)
-            fig = go.Figure()
-            fig.add_trace(
-                go.Line(
-                    name="Loss",
-                    x=df["epoch"],
-                    y=df["loss"],
-                )
-            )
-            fig.update_layout(
-                xaxis={"title": "Epoch"},
-                yaxis={"title": "Loss"},  # 'tickformat':'.2e'},
-                title="Epoch</b>VS</b>Loss",
-                title_x=0.5,
-            )
-            st.plotly_chart(fig, theme=None, use_container_width=True)
-
-
-
-# if terms
-
-
-# with st.spinner("Training the model..."):
-#     if disease == 'Influenza':
-#         response = influenza_train_and_predict(df, epochs, num_weeks)
-
-# st.text("Model trained successfully !")
-
-# disease
-# # of weeks prediction
-# Prediction leve: National
-# Level
-# Sublevel
-# Keywords
-# Epochs
-# predict
+# Add a button to clear cache if needed
+with st.sidebar:
+    if st.button("Clear Cache"):
+        # Clear all caches
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.session_state.previous_predictions = {}
+        st.success("Cache cleared successfully!")
