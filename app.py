@@ -149,7 +149,7 @@ def create_cache_key(terms, pred_level, states, epochs=None, num_weeks=None):
 
 # Function to generate future forecasts
 def generate_future_forecast(last_actual_value, num_weeks, confidence_interval):
-    """Generate future forecast values based on the last actual data point"""
+    """Generate simple future forecast values based on the last actual data point"""
     forecast_values = []
     current_value = last_actual_value
     
@@ -181,7 +181,6 @@ if disease == INFLUENZA and terms:
 
 # Model prediction phase - using both decorator caching and session state caching
 response = None
-forecast = None  # New variable to store forecast data
 if disease == INFLUENZA and predict and df is not None:
     # Create a unique cache key for this prediction
     cache_key = create_cache_key(terms, pred_level, states, epochs, num_weeks)
@@ -199,37 +198,42 @@ if disease == INFLUENZA and predict and df is not None:
         st.session_state.previous_predictions[cache_key] = response
 
     if response:
-        # Generate future forecast data
-        last_actual_value = response.get("actual_data")[-1]
-        ci = response.get("confidence_interval")
-        forecast = generate_future_forecast(last_actual_value, num_weeks, ci)
-
         st.header(f"{disease} Prediction results")
-
-        # Create two columns for the historical prediction and future forecast
+        
+        # Create dataframe for historical predictions
+        results_df = pd.DataFrame({
+            "actual_data": response.get("actual_data"),
+            "predictions": response.get("predictions"),
+        })
+        
+        results_df["week"] = range(1, len(results_df) + 1)
+        ci = response.get("confidence_interval")
+        results_df["predictions_upper"] = results_df["predictions"] + results_df["predictions"] * 0.01 * ci
+        results_df["predictions_lower"] = results_df["predictions"] - results_df["predictions"] * 0.01 * ci
+        
+        # Generate future forecast
+        last_actual_value = response.get("actual_data")[-1]
+        last_week_num = len(results_df)
+        forecast = generate_future_forecast(last_actual_value, num_weeks, ci)
+        
+        # Create two columns for the graphs
         col1, col2 = st.columns(2)
-
+        
+        # Historical Prediction Graph
         with col1:
-            st.subheader("Historical Prediction")
-            
-            results_df = pd.DataFrame(
-                {
-                    "actual_data": response.get("actual_data"),
-                    "predictions": response.get("predictions"),
-                }
-            )
-
-            results_df["week"] = range(1, len(results_df) + 1)
-            results_df["predictions_upper"] = results_df["predictions"] + results_df["predictions"] * 0.01 * ci
-            results_df["predictions_lower"] = results_df["predictions"] - results_df["predictions"] * 0.01 * ci
+            st.markdown("""
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                <h3 style="color: #31708f; margin-top: 0;">Historical Prediction</h3>
+            </div>
+            """, unsafe_allow_html=True)
             
             fig1 = go.Figure()
-
+            
             fig1.add_trace(
                 go.Scatter(name="Actual Data", x=results_df["week"], y=results_df["actual_data"],
                          mode="lines", line=dict(color="rgb(31, 119, 180)"))
             )
-
+            
             fig1.add_trace(
                 go.Scatter(
                     name="Predictions",
@@ -239,7 +243,7 @@ if disease == INFLUENZA and predict and df is not None:
                     line=dict(color="rgb(255, 127, 14)")
                 )
             )
-
+            
             fig1.add_trace(
                 go.Scatter(
                     name="Upper Bound",
@@ -251,6 +255,7 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
+            
             fig1.add_trace(
                 go.Scatter(
                     name="Lower Bound",
@@ -264,34 +269,45 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
-
+            
             fig1.update_layout(
                 xaxis={"title": "Week"},
                 yaxis={"title": "ILI Cases"},
-                margin=dict(l=10, r=10, t=10, b=10),
                 height=400,
+                margin=dict(l=10, r=10, t=10, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-
+            
             st.plotly_chart(fig1, use_container_width=True)
-
+        
+        # Future Forecast Graph
         with col2:
-            st.subheader(f"Future Forecast ({num_weeks} weeks)")
+            st.markdown(f"""
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                <h3 style="color: #2c7fb8; margin-top: 0;">Future Forecast ({num_weeks} weeks)</h3>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Get the last actual data point and week number
-            last_week_num = len(results_df)
-            
-            # Create forecast dataframe
-            forecast_df = pd.DataFrame({
-                "week": range(last_week_num, last_week_num + num_weeks + 1),
-                "forecast": [last_actual_value] + forecast["values"],
-                "upper_bound": [last_actual_value] + forecast["upper_bounds"],
-                "lower_bound": [last_actual_value] + forecast["lower_bounds"]
-            })
+            # Create forecast dataframe - Include the last point for continuity
+            forecast_weeks = list(range(last_week_num, last_week_num + num_weeks + 1))
+            forecast_values = [last_actual_value] + forecast["values"]
+            upper_values = [last_actual_value] + forecast["upper_bounds"]
+            lower_values = [last_actual_value] + forecast["lower_bounds"]
             
             fig2 = go.Figure()
             
-            # Add the actual data point marker
+            # Add the forecast line with the connection point
+            fig2.add_trace(
+                go.Scatter(
+                    name="Forecast",
+                    x=forecast_weeks,
+                    y=forecast_values,
+                    mode="lines",
+                    line=dict(color="rgb(214, 39, 40)")
+                )
+            )
+            
+            # Add the last actual data point marker
             fig2.add_trace(
                 go.Scatter(
                     name="Last Actual", 
@@ -302,35 +318,23 @@ if disease == INFLUENZA and predict and df is not None:
                 )
             )
             
-            # Add the forecast line
-            fig2.add_trace(
-                go.Scatter(
-                    name="Forecast",
-                    x=forecast_df["week"],
-                    y=forecast_df["forecast"],
-                    mode="lines",
-                    line=dict(color="rgb(214, 39, 40)")
-                )
-            )
-            
             # Add confidence intervals
             fig2.add_trace(
                 go.Scatter(
                     name="Upper Bound",
-                    x=forecast_df["week"],
-                    y=forecast_df["upper_bound"],
+                    x=forecast_weeks,
+                    y=upper_values,
                     mode="lines",
-                    marker=dict(color="#444"),
                     line=dict(width=0),
                     showlegend=False,
                 )
             )
+            
             fig2.add_trace(
                 go.Scatter(
                     name="Lower Bound",
-                    x=forecast_df["week"],
-                    y=forecast_df["lower_bound"],
-                    marker=dict(color="#444"),
+                    x=forecast_weeks,
+                    y=lower_values,
                     line=dict(width=0),
                     mode="lines",
                     fillcolor="rgba(214, 39, 40, 0.2)",
@@ -342,13 +346,13 @@ if disease == INFLUENZA and predict and df is not None:
             fig2.update_layout(
                 xaxis={"title": "Week", "range": [last_week_num - 2, last_week_num + num_weeks + 1]},
                 yaxis={"title": "Predicted ILI Cases"},
-                margin=dict(l=10, r=10, t=10, b=10),
                 height=400,
+                margin=dict(l=10, r=10, t=10, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             
             st.plotly_chart(fig2, use_container_width=True)
-
+        
         # Metrics in two columns
         metric_col1, metric_col2 = st.columns(2)
         
