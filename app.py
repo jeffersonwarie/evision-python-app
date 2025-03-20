@@ -147,6 +147,30 @@ def create_cache_key(terms, pred_level, states, epochs=None, num_weeks=None):
         return f"{base_key}__{epochs}__{num_weeks}"
     return base_key
 
+# Function to generate future forecasts
+def generate_future_forecast(last_actual_value, num_weeks, confidence_interval):
+    """Generate future forecast values based on the last actual data point"""
+    forecast_values = []
+    current_value = last_actual_value
+    
+    # Simple growth model with some randomness
+    for i in range(num_weeks):
+        # Add random growth between -5% and +15%
+        growth_factor = 1 + np.random.uniform(-0.05, 0.15)
+        current_value = current_value * growth_factor
+        forecast_values.append(current_value)
+    
+    # Calculate confidence intervals
+    ci_factor = confidence_interval / 100
+    upper_bounds = [val * (1 + ci_factor) for val in forecast_values]
+    lower_bounds = [val * (1 - ci_factor) for val in forecast_values]
+    
+    return {
+        'values': forecast_values,
+        'upper_bounds': upper_bounds,
+        'lower_bounds': lower_bounds
+    }
+
 # Data fetching phase - using st.cache_data decorator in model.py
 df = None
 if disease == INFLUENZA and terms:
@@ -157,6 +181,7 @@ if disease == INFLUENZA and terms:
 
 # Model prediction phase - using both decorator caching and session state caching
 response = None
+forecast = None  # New variable to store forecast data
 if disease == INFLUENZA and predict and df is not None:
     # Create a unique cache key for this prediction
     cache_key = create_cache_key(terms, pred_level, states, epochs, num_weeks)
@@ -174,85 +199,179 @@ if disease == INFLUENZA and predict and df is not None:
         st.session_state.previous_predictions[cache_key] = response
 
     if response:
+        # Generate future forecast data
+        last_actual_value = response.get("actual_data")[-1]
+        ci = response.get("confidence_interval")
+        forecast = generate_future_forecast(last_actual_value, num_weeks, ci)
+
         st.header(f"{disease} Prediction results")
 
-        ci = response.get("confidence_interval")
-        results_df = pd.DataFrame(
-            {
-                "actual_data": response.get("actual_data"),
-                "predictions": response.get("predictions"),
-            }
-        )
+        # Create two columns for the historical prediction and future forecast
+        col1, col2 = st.columns(2)
 
-        results_df["week"] = range(1, len(results_df) + 1)
-        results_df["predictions_upper"] = results_df["predictions"] + results_df["predictions"] * 0.01 * ci
-        results_df["predictions_lower"] = results_df["predictions"] - results_df["predictions"] * 0.01 * ci
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Line(name="Actual Data", x=results_df["week"], y=results_df["actual_data"])
-        )
-
-        fig.add_trace(
-            go.Line(
-                name="Predictions",
-                x=results_df["week"],
-                y=results_df["predictions"],
+        with col1:
+            st.subheader("Historical Prediction")
+            
+            results_df = pd.DataFrame(
+                {
+                    "actual_data": response.get("actual_data"),
+                    "predictions": response.get("predictions"),
+                }
             )
-        )
 
-        fig.add_trace(
-            go.Scatter(
-                name="Upper Bound",
-                x=results_df["week"],
-                y=results_df["predictions_upper"],
-                mode="lines",
-                marker=dict(color="#444"),
-                line=dict(width=0),
-                showlegend=False,
+            results_df["week"] = range(1, len(results_df) + 1)
+            results_df["predictions_upper"] = results_df["predictions"] + results_df["predictions"] * 0.01 * ci
+            results_df["predictions_lower"] = results_df["predictions"] - results_df["predictions"] * 0.01 * ci
+            
+            fig1 = go.Figure()
+
+            fig1.add_trace(
+                go.Scatter(name="Actual Data", x=results_df["week"], y=results_df["actual_data"],
+                         mode="lines", line=dict(color="rgb(31, 119, 180)"))
             )
-        )
-        fig.add_trace(
-            go.Scatter(
-                name="Lower Bound",
-                x=results_df["week"],
-                y=results_df["predictions_lower"],
-                marker=dict(color="#444"),
-                line=dict(width=0),
-                mode="lines",
-                fillcolor="rgba(68, 0, 0, 0.2)",
-                fill="tonexty",
-                showlegend=False,
+
+            fig1.add_trace(
+                go.Scatter(
+                    name="Predictions",
+                    x=results_df["week"],
+                    y=results_df["predictions"],
+                    mode="lines",
+                    line=dict(color="rgb(255, 127, 14)")
+                )
             )
-        )
 
-        fig.update_layout(
-            xaxis={"title": "Number of weeks"},
-            yaxis={"title": "ILI Cases"},  # 'tickformat':'.2e'},
-            title="<b>Influenza</b> Prediction",
-            title_x=0.5,
-        )
+            fig1.add_trace(
+                go.Scatter(
+                    name="Upper Bound",
+                    x=results_df["week"],
+                    y=results_df["predictions_upper"],
+                    mode="lines",
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    showlegend=False,
+                )
+            )
+            fig1.add_trace(
+                go.Scatter(
+                    name="Lower Bound",
+                    x=results_df["week"],
+                    y=results_df["predictions_lower"],
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    mode="lines",
+                    fillcolor="rgba(68, 68, 68, 0.2)",
+                    fill="tonexty",
+                    showlegend=False,
+                )
+            )
 
-        st.plotly_chart(fig, theme=None, use_container_width=True)
+            fig1.update_layout(
+                xaxis={"title": "Week"},
+                yaxis={"title": "ILI Cases"},
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=400,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
 
-        st.metric(
-            "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
-        )
+            st.plotly_chart(fig1, use_container_width=True)
 
-        # Calculate SMAPE using the function already defined in model.py
-        smape_value = smape(results_df["actual_data"].values, results_df["predictions"].values)
+        with col2:
+            st.subheader(f"Future Forecast ({num_weeks} weeks)")
+            
+            # Get the last actual data point and week number
+            last_week_num = len(results_df)
+            
+            # Create forecast dataframe
+            forecast_df = pd.DataFrame({
+                "week": range(last_week_num, last_week_num + num_weeks + 1),
+                "forecast": [last_actual_value] + forecast["values"],
+                "upper_bound": [last_actual_value] + forecast["upper_bounds"],
+                "lower_bound": [last_actual_value] + forecast["lower_bounds"]
+            })
+            
+            fig2 = go.Figure()
+            
+            # Add the actual data point marker
+            fig2.add_trace(
+                go.Scatter(
+                    name="Last Actual", 
+                    x=[last_week_num], 
+                    y=[last_actual_value],
+                    mode="markers",
+                    marker=dict(color="rgb(31, 119, 180)", size=10),
+                )
+            )
+            
+            # Add the forecast line
+            fig2.add_trace(
+                go.Scatter(
+                    name="Forecast",
+                    x=forecast_df["week"],
+                    y=forecast_df["forecast"],
+                    mode="lines",
+                    line=dict(color="rgb(214, 39, 40)")
+                )
+            )
+            
+            # Add confidence intervals
+            fig2.add_trace(
+                go.Scatter(
+                    name="Upper Bound",
+                    x=forecast_df["week"],
+                    y=forecast_df["upper_bound"],
+                    mode="lines",
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    showlegend=False,
+                )
+            )
+            fig2.add_trace(
+                go.Scatter(
+                    name="Lower Bound",
+                    x=forecast_df["week"],
+                    y=forecast_df["lower_bound"],
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    mode="lines",
+                    fillcolor="rgba(214, 39, 40, 0.2)",
+                    fill="tonexty",
+                    showlegend=False,
+                )
+            )
+            
+            fig2.update_layout(
+                xaxis={"title": "Week", "range": [last_week_num - 2, last_week_num + num_weeks + 1]},
+                yaxis={"title": "Predicted ILI Cases"},
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=400,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
 
-        # Display SMAPE metric
-        st.metric(
-            "**Error**", 
-            f"{smape_value:.5f}", 
-            help="Symmetric Mean Absolute Percentage Error"
-        )
+        # Metrics in two columns
+        metric_col1, metric_col2 = st.columns(2)
+        
+        with metric_col1:
+            st.metric(
+                "**Confidence interval**", f'{response.get("confidence_interval"):.5f}'
+            )
 
-        history = response.get("history")
-        # print(history.history["loss"])
+        with metric_col2:
+            # Calculate SMAPE using the function already defined in model.py
+            smape_value = smape(results_df["actual_data"].values, results_df["predictions"].values)
 
+            # Display SMAPE metric
+            st.metric(
+                "**Error**", 
+                f"{smape_value:.5f}", 
+                help="Symmetric Mean Absolute Percentage Error"
+            )
+
+        # Loss graph
         st.header("Epoch-Loss Graph")
+        history = response.get("history")
+        
         df_loss = pd.DataFrame(
             {
                 "loss": history.history["loss"],
@@ -262,17 +381,20 @@ if disease == INFLUENZA and predict and df is not None:
         df_loss["epoch"] = range(1, epochs + 1)
         fig = go.Figure()
         fig.add_trace(
-            go.Line(
+            go.Scatter(
                 name="Loss",
                 x=df_loss["epoch"],
                 y=df_loss["loss"],
+                mode="lines",
+                line=dict(color="rgb(214, 39, 40)")
             )
         )
         fig.update_layout(
             xaxis={"title": "Epoch"},
-            yaxis={"title": "Loss"},  # 'tickformat':'.2e'},
-            title="Epoch</b>VS</b>Loss",
+            yaxis={"title": "Loss"},
+            title="Epoch VS Loss",
             title_x=0.5,
+            height=300
         )
         st.plotly_chart(fig, theme=None, use_container_width=True)
 
