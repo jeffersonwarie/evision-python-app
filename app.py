@@ -227,149 +227,139 @@ if disease == INFLUENZA and predict and df is not None:
 
         # For the Historical Prediction graph
         with col1:
-            # Replace the current markdown and separate chart with a container that has both
-            with st.container():
-                st.markdown("""
-                <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; height: 450px;">
-                    <h3 style="color: #31708f; margin-top: 0;">Historical Prediction</h3>
-                """, unsafe_allow_html=True)
-                
-                fig1 = go.Figure()
-                
-                fig1.add_trace(
-                    go.Scatter(name="Actual Data", x=results_df["date"], y=results_df["actual_data"],
-                            mode="lines", line=dict(color="rgb(31, 119, 180)"))
+            # Replace the boxed markup with simple headers
+            st.markdown("""
+            <h3 style="color: #31708f; margin-top: 0;">Historical Prediction</h3>
+            """, unsafe_allow_html=True)
+            
+            fig1 = go.Figure()
+            
+            fig1.add_trace(
+                go.Scatter(name="Actual Data", x=results_df["date"], y=results_df["actual_data"],
+                        mode="lines", line=dict(color="rgb(31, 119, 180)"))
+            )
+            
+            fig1.add_trace(
+                go.Scatter(
+                    name="Predictions",
+                    x=results_df["date"],
+                    y=results_df["predictions"],
+                    mode="lines",
+                    line=dict(color="rgb(255, 127, 14)")
                 )
-                
-                fig1.add_trace(
-                    go.Scatter(
-                        name="Predictions",
-                        x=results_df["date"],
-                        y=results_df["predictions"],
-                        mode="lines",
-                        line=dict(color="rgb(255, 127, 14)")
-                    )
+            )
+            
+            fig1.add_trace(
+                go.Scatter(
+                    name="Upper Bound",
+                    x=results_df["date"],
+                    y=results_df["predictions_upper"],
+                    mode="lines",
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    showlegend=False,
                 )
-                
-                fig1.add_trace(
-                    go.Scatter(
-                        name="Upper Bound",
-                        x=results_df["date"],
-                        y=results_df["predictions_upper"],
-                        mode="lines",
-                        marker=dict(color="#444"),
-                        line=dict(width=0),
-                        showlegend=False,
-                    )
+            )
+            
+            fig1.add_trace(
+                go.Scatter(
+                    name="Lower Bound",
+                    x=results_df["date"],
+                    y=results_df["predictions_lower"],
+                    marker=dict(color="#444"),
+                    line=dict(width=0),
+                    mode="lines",
+                    fillcolor="rgba(68, 68, 68, 0.2)",
+                    fill="tonexty",
+                    showlegend=False,
                 )
-                
-                fig1.add_trace(
-                    go.Scatter(
-                        name="Lower Bound",
-                        x=results_df["date"],
-                        y=results_df["predictions_lower"],
-                        marker=dict(color="#444"),
-                        line=dict(width=0),
-                        mode="lines",
-                        fillcolor="rgba(68, 68, 68, 0.2)",
-                        fill="tonexty",
-                        showlegend=False,
-                    )
-                )
-                
-                fig1.update_layout(
-                    xaxis={"title": "Date", "tickangle": 45},
-                    yaxis={"title": "ILI Cases"},
-                    height=380,  # Slightly reduced to fit in container
-                    margin=dict(l=10, r=10, t=10, b=10),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                
-                st.plotly_chart(fig1, use_container_width=True)
-                
-                # Close the div container
-                st.markdown("</div>", unsafe_allow_html=True)
+            )
+            
+            fig1.update_layout(
+                xaxis={"title": "Date", "tickangle": 45},
+                yaxis={"title": "ILI Cases"},
+                height=400,
+                margin=dict(l=10, r=10, t=10, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig1, use_container_width=True)
 
         # For the Future Forecast graph
         with col2:
-            # Replace the current markdown and separate chart with a container that has both
-            with st.container():
-                st.markdown(f"""
-                <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; height: 450px;">
-                    <h3 style="color: #2c7fb8; margin-top: 0;">Future Forecast ({num_weeks} weeks)</h3>
-                """, unsafe_allow_html=True)
-                
-                # Create forecast dataframe - Include the last point for continuity
-                # Generate future dates
-                last_date = pd.to_datetime(results_df["date"].iloc[-1])
-                future_dates = [last_date + pd.Timedelta(weeks=i) for i in range(num_weeks + 1)]
-                future_dates_str = [date.strftime('%Y-%m-%d') for date in future_dates]
-                
-                forecast_values = [last_actual_value] + forecast["values"]
-                upper_values = [last_actual_value] + forecast["upper_bounds"]
-                lower_values = [last_actual_value] + forecast["lower_bounds"]
-                
-                fig2 = go.Figure()
-                
-                # Add the forecast line with the connection point
-                fig2.add_trace(
-                    go.Scatter(
-                        name="Forecast",
-                        x=future_dates_str,
-                        y=forecast_values,
-                        mode="lines",
-                        line=dict(color="rgb(214, 39, 40)")
-                    )
+            # Replace the boxed markup with simple headers
+            st.markdown(f"""
+            <h3 style="color: #2c7fb8; margin-top: 0;">Future Forecast ({num_weeks} weeks)</h3>
+            """, unsafe_allow_html=True)
+            
+            # Create forecast dataframe - Include the last point for continuity
+            # Generate future dates
+            last_date = pd.to_datetime(results_df["date"].iloc[-1])
+            future_dates = [last_date + pd.Timedelta(weeks=i) for i in range(num_weeks + 1)]
+            future_dates_str = [date.strftime('%Y-%m-%d') for date in future_dates]
+            
+            forecast_values = [last_actual_value] + forecast["values"]
+            upper_values = [last_actual_value] + forecast["upper_bounds"]
+            lower_values = [last_actual_value] + forecast["lower_bounds"]
+            
+            fig2 = go.Figure()
+            
+            # Add the forecast line with the connection point
+            fig2.add_trace(
+                go.Scatter(
+                    name="Forecast",
+                    x=future_dates_str,
+                    y=forecast_values,
+                    mode="lines",
+                    line=dict(color="rgb(214, 39, 40)")
                 )
-                
-                # Add the last actual data point marker
-                fig2.add_trace(
-                    go.Scatter(
-                        name="Last Actual", 
-                        x=[future_dates_str[0]], 
-                        y=[last_actual_value],
-                        mode="markers",
-                        marker=dict(color="rgb(31, 119, 180)", size=10),
-                    )
+            )
+            
+            # Add the last actual data point marker
+            fig2.add_trace(
+                go.Scatter(
+                    name="Last Actual", 
+                    x=[future_dates_str[0]], 
+                    y=[last_actual_value],
+                    mode="markers",
+                    marker=dict(color="rgb(31, 119, 180)", size=10),
                 )
-                
-                # Add confidence intervals
-                fig2.add_trace(
-                    go.Scatter(
-                        name="Upper Bound",
-                        x=future_dates_str,
-                        y=upper_values,
-                        mode="lines",
-                        line=dict(width=0),
-                        showlegend=False,
-                    )
+            )
+            
+            # Add confidence intervals
+            fig2.add_trace(
+                go.Scatter(
+                    name="Upper Bound",
+                    x=future_dates_str,
+                    y=upper_values,
+                    mode="lines",
+                    line=dict(width=0),
+                    showlegend=False,
                 )
-                
-                fig2.add_trace(
-                    go.Scatter(
-                        name="Lower Bound",
-                        x=future_dates_str,
-                        y=lower_values,
-                        line=dict(width=0),
-                        mode="lines",
-                        fillcolor="rgba(214, 39, 40, 0.2)",
-                        fill="tonexty",
-                        showlegend=False,
-                    )
+            )
+            
+            fig2.add_trace(
+                go.Scatter(
+                    name="Lower Bound",
+                    x=future_dates_str,
+                    y=lower_values,
+                    line=dict(width=0),
+                    mode="lines",
+                    fillcolor="rgba(214, 39, 40, 0.2)",
+                    fill="tonexty",
+                    showlegend=False,
                 )
-                
-                fig2.update_layout(
-                    xaxis={"title": "Date", "tickangle": 45},
-                    yaxis={"title": "Predicted ILI Cases"},
-                    height=380,  # Slightly reduced to fit in container
-                    margin=dict(l=10, r=10, t=10, b=10),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                
-                st.plotly_chart(fig2, use_container_width=True)
-                
-                # Close the div container
-                st.markdown("</div>", unsafe_allow_html=True)
+            )
+            
+            fig2.update_layout(
+                xaxis={"title": "Date", "tickangle": 45},
+                yaxis={"title": "Predicted ILI Cases"},
+                height=400,
+                margin=dict(l=10, r=10, t=10, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
         
         # Metrics in two columns
         metric_col1, metric_col2 = st.columns(2)
