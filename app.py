@@ -200,10 +200,14 @@ if disease == INFLUENZA and predict and df is not None:
     if response:
         st.header(f"{disease} Prediction results")
         
+        # Get dates from response
+        dates = response.get("dates", [])
+    
         # Create dataframe for historical predictions
         results_df = pd.DataFrame({
             "actual_data": response.get("actual_data"),
             "predictions": response.get("predictions"),
+            "date": dates[-len(response.get("actual_data")):],  # Match dates with actual data length
         })
         
         results_df["week"] = range(1, len(results_df) + 1)
@@ -230,24 +234,24 @@ if disease == INFLUENZA and predict and df is not None:
             fig1 = go.Figure()
             
             fig1.add_trace(
-                go.Scatter(name="Actual Data", x=results_df["week"], y=results_df["actual_data"],
-                         mode="lines", line=dict(color="rgb(31, 119, 180)"))
+                go.Scatter(name="Actual Data", x=results_df["date"], y=results_df["actual_data"],
+                           mode="lines", line=dict(color="rgb(31, 119, 180)"))
             )
-            
+
             fig1.add_trace(
                 go.Scatter(
                     name="Predictions",
-                    x=results_df["week"],
+                    x=results_df["date"],
                     y=results_df["predictions"],
                     mode="lines",
                     line=dict(color="rgb(255, 127, 14)")
                 )
             )
-            
+
             fig1.add_trace(
                 go.Scatter(
                     name="Upper Bound",
-                    x=results_df["week"],
+                    x=results_df["date"],
                     y=results_df["predictions_upper"],
                     mode="lines",
                     marker=dict(color="#444"),
@@ -255,11 +259,11 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
-            
+
             fig1.add_trace(
                 go.Scatter(
                     name="Lower Bound",
-                    x=results_df["week"],
+                    x=results_df["date"],
                     y=results_df["predictions_lower"],
                     marker=dict(color="#444"),
                     line=dict(width=0),
@@ -269,14 +273,15 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
-            
+
             fig1.update_layout(
-                xaxis={"title": "Week"},
+                xaxis={"title": "Date", "tickangle": 45},
                 yaxis={"title": "ILI Cases"},
                 height=400,
                 margin=dict(l=10, r=10, t=10, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
+
             
             st.plotly_chart(fig1, use_container_width=True)
         
@@ -287,6 +292,12 @@ if disease == INFLUENZA and predict and df is not None:
                 <h3 style="color: #2c7fb8; margin-top: 0;">Future Forecast ({num_weeks} weeks)</h3>
             </div>
             """, unsafe_allow_html=True)
+
+            # Extract the last actual date
+            last_date = pd.to_datetime(results_df["date"].iloc[-1])
+            # Generate future dates
+            future_dates = [last_date + pd.Timedelta(weeks=i) for i in range(num_weeks + 1)]
+            future_dates_str = [date.strftime('%Y-%m-%d') for date in future_dates]
             
             # Create forecast dataframe - Include the last point for continuity
             forecast_weeks = list(range(last_week_num, last_week_num + num_weeks + 1))
@@ -300,7 +311,7 @@ if disease == INFLUENZA and predict and df is not None:
             fig2.add_trace(
                 go.Scatter(
                     name="Forecast",
-                    x=forecast_weeks,
+                    x=future_dates_str,
                     y=forecast_values,
                     mode="lines",
                     line=dict(color="rgb(214, 39, 40)")
@@ -311,7 +322,7 @@ if disease == INFLUENZA and predict and df is not None:
             fig2.add_trace(
                 go.Scatter(
                     name="Last Actual", 
-                    x=[last_week_num], 
+                    x=[future_dates_str[0]], 
                     y=[last_actual_value],
                     mode="markers",
                     marker=dict(color="rgb(31, 119, 180)", size=10),
@@ -322,7 +333,7 @@ if disease == INFLUENZA and predict and df is not None:
             fig2.add_trace(
                 go.Scatter(
                     name="Upper Bound",
-                    x=forecast_weeks,
+                    x=future_dates_str,
                     y=upper_values,
                     mode="lines",
                     line=dict(width=0),
@@ -333,7 +344,7 @@ if disease == INFLUENZA and predict and df is not None:
             fig2.add_trace(
                 go.Scatter(
                     name="Lower Bound",
-                    x=forecast_weeks,
+                    x=future_dates_str,
                     y=lower_values,
                     line=dict(width=0),
                     mode="lines",
@@ -344,11 +355,11 @@ if disease == INFLUENZA and predict and df is not None:
             )
             
             fig2.update_layout(
-                xaxis={"title": "Week", "range": [last_week_num - 2, last_week_num + num_weeks + 1]},
-                yaxis={"title": "Predicted ILI Cases"},
-                height=400,
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    xaxis={"title": "Date", "tickangle": 45},
+                    yaxis={"title": "Predicted ILI Cases"},
+                    height=400,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             
             st.plotly_chart(fig2, use_container_width=True)

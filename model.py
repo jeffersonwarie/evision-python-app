@@ -82,6 +82,7 @@ def influenza_train_and_predict(
     # Create a copy of data to avoid modifying the cached dataframe
     data = data.copy()
     
+    # Save the dates column before dropping it
     dates = data["date"].to_list()
     data.drop(columns=["date"], inplace=True)
     data = data.astype(float)
@@ -119,7 +120,7 @@ def influenza_train_and_predict(
     logging.info(f"Finished compiling the model. Starting training")
 
     response = {}
-    response["dates"] = dates
+    response["dates"] = dates  # Include the full list of dates in the response
 
     history = model1.fit(
         trainX, trainy, batch_size=batch_size, epochs=epochs, shuffle=False

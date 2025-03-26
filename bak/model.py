@@ -34,6 +34,7 @@ def fetch_csv_from_url(url: str, skiprows: List[int] = None, na_values: str = No
         logging.error(f"Error fetching data from {url}: {str(e)}")
         raise
 
+@st.cache_data(ttl=3600)  # Cache data for 1 hour
 def fetch_data(terms: List, level: str, states: str = None) -> pd.DataFrame:
     try:
         return fetch_data_from_csv(terms, level, states)
@@ -74,9 +75,13 @@ def fetch_data_from_csv(terms: List, level: str, states: str = None) -> pd.DataF
         logging.error(f"Error processing CSV data: {str(e)}")
         raise
 
+@st.cache_resource
 def influenza_train_and_predict(
     data: pd.DataFrame, epochs: int, predict_ahead_by: int
 ) -> Dict[str, Any]:
+    # Create a copy of data to avoid modifying the cached dataframe
+    data = data.copy()
+    
     dates = data["date"].to_list()
     data.drop(columns=["date"], inplace=True)
     data = data.astype(float)
@@ -132,3 +137,52 @@ def influenza_train_and_predict(
     response["confidence_interval"] = ci
 
     return response
+
+def generate_future_forecast(model, last_input_data, num_weeks, confidence_interval):
+    """
+    Generate future forecast using the trained model.
+    
+    Args:
+        model: Trained Keras model
+        last_input_data: The last input data used for prediction
+        num_weeks: Number of weeks to forecast
+        confidence_interval: Confidence interval value for error bounds
+        
+    Returns:
+        Dictionary containing forecast values and confidence intervals
+    """
+    import numpy as np
+    
+    # Initialize storage for forecasts
+    forecasts = []
+    
+    # Start with the last input
+    current_input = last_input_data.copy()
+    
+    # Reshape for prediction
+    input_shape = (1, current_input.shape[1], 1)
+    
+    # For each future week, generate the forecast
+    for i in range(num_weeks):
+        # Reshape input for prediction
+        input_reshaped = np.reshape(current_input, input_shape)
+        
+        # Generate prediction
+        pred = model.predict(input_reshaped, verbose=0)
+        forecasts.append(float(pred[0][0]))
+        
+        # Update input for next prediction by shifting window
+        # This is a simplified approach - in a real system you'd need to update all features
+        current_input = np.roll(current_input, -1)
+        current_input[0, -1] = forecasts[-1]
+    
+    # Calculate confidence intervals
+    ci_factor = confidence_interval / 100
+    upper_bounds = [val * (1 + ci_factor) for val in forecasts]
+    lower_bounds = [val * (1 - ci_factor) for val in forecasts]
+    
+    return {
+        'values': forecasts,
+        'upper_bounds': upper_bounds,
+        'lower_bounds': lower_bounds
+    }
