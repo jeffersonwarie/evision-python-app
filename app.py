@@ -423,16 +423,6 @@ if disease == INFLUENZA and predict and df is not None:
                 line=dict(color="rgb(214, 39, 40)")
             )
         )
-        # Add vertical lines for each epoch
-        for epoch in df_loss["epoch"]:
-            fig.add_shape(
-                type="line",
-                x0=epoch,
-                y0=0,
-                x1=epoch,
-                y1=df_loss["loss"].max() * 1.05,
-                line=dict(color="black", width=1, dash="dash"),
-            )
         fig.update_layout(
             xaxis={"title": "Epoch"},
             yaxis={"title": "Loss"},
