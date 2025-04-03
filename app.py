@@ -236,8 +236,7 @@ if disease == INFLUENZA and predict and df is not None:
             
             fig1.add_trace(
                 go.Scatter(name="Actual Data", x=results_df["date"], y=results_df["actual_data"],
-                        mode="lines+markers", line=dict(color="rgb(31, 119, 180)"),
-                        marker=dict(size=6, line=dict(width=1, color="rgb(31, 119, 180)")))
+                        mode="lines", line=dict(color="rgb(31, 119, 180)"))
             )
             
             fig1.add_trace(
@@ -245,9 +244,8 @@ if disease == INFLUENZA and predict and df is not None:
                     name="Predictions",
                     x=results_df["date"],
                     y=results_df["predictions"],
-                    mode="lines+markers",
-                    line=dict(color="rgb(255, 127, 14)"),
-                    marker=dict(size=6, line=dict(width=1, color="rgb(255, 127, 14)"))
+                    mode="lines",
+                    line=dict(color="rgb(255, 127, 14)")
                 )
             )
             
@@ -276,6 +274,17 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
+
+            # Add vertical lines for each date
+            for date in results_df["date"]:
+                fig1.add_shape(
+                    type="line",
+                    x0=date,
+                    y0=0,
+                    x1=date,
+                    y1=max(results_df["actual_data"].max(), results_df["predictions_upper"].max()) * 1.05,
+                    line=dict(color="lightgray", width=1, dash="dash"),
+                )
             
             fig1.update_layout(
                 xaxis={"title": "Date", "tickangle": 45},
@@ -352,6 +361,17 @@ if disease == INFLUENZA and predict and df is not None:
                     showlegend=False,
                 )
             )
+
+            # Add vertical lines for each date
+            for date in future_dates_str:
+                fig2.add_shape(
+                    type="line",
+                    x0=date,
+                    y0=0,
+                    x1=date,
+                    y1=max(upper_values) * 1.05,
+                    line=dict(color="lightgray", width=1, dash="dash"),
+                )
             
             fig2.update_layout(
                 xaxis={"title": "Date", "tickangle": 45},
@@ -403,6 +423,16 @@ if disease == INFLUENZA and predict and df is not None:
                 line=dict(color="rgb(214, 39, 40)")
             )
         )
+        # Add vertical lines for each epoch
+        for epoch in df_loss["epoch"]:
+            fig.add_shape(
+                type="line",
+                x0=epoch,
+                y0=0,
+                x1=epoch,
+                y1=df_loss["loss"].max() * 1.05,
+                line=dict(color="lightgray", width=1, dash="dash"),
+            )
         fig.update_layout(
             xaxis={"title": "Epoch"},
             yaxis={"title": "Loss"},
