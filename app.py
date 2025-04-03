@@ -236,7 +236,8 @@ if disease == INFLUENZA and predict and df is not None:
             
             fig1.add_trace(
                 go.Scatter(name="Actual Data", x=results_df["date"], y=results_df["actual_data"],
-                        mode="lines", line=dict(color="rgb(31, 119, 180)"))
+                        mode="lines+markers", line=dict(color="rgb(31, 119, 180)"),
+                        marker=dict(size=6, line=dict(width=1, color="rgb(31, 119, 180)")))
             )
             
             fig1.add_trace(
@@ -244,8 +245,9 @@ if disease == INFLUENZA and predict and df is not None:
                     name="Predictions",
                     x=results_df["date"],
                     y=results_df["predictions"],
-                    mode="lines",
-                    line=dict(color="rgb(255, 127, 14)")
+                    mode="lines+markers",
+                    line=dict(color="rgb(255, 127, 14)"),
+                    marker=dict(size=6, line=dict(width=1, color="rgb(255, 127, 14)"))
                 )
             )
             
