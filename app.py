@@ -283,7 +283,7 @@ if disease == INFLUENZA and predict and df is not None:
                     y0=0,
                     x1=date,
                     y1=max(results_df["actual_data"].max(), results_df["predictions_upper"].max()) * 1.05,
-                    line=dict(color="lightgray", width=1, dash="dash"),
+                    line=dict(color="black", width=1, dash="dash"),
                 )
             
             fig1.update_layout(
@@ -370,7 +370,7 @@ if disease == INFLUENZA and predict and df is not None:
                     y0=0,
                     x1=date,
                     y1=max(upper_values) * 1.05,
-                    line=dict(color="lightgray", width=1, dash="dash"),
+                    line=dict(color="black", width=1, dash="dash"),
                 )
             
             fig2.update_layout(
@@ -431,7 +431,7 @@ if disease == INFLUENZA and predict and df is not None:
                 y0=0,
                 x1=epoch,
                 y1=df_loss["loss"].max() * 1.05,
-                line=dict(color="lightgray", width=1, dash="dash"),
+                line=dict(color="black", width=1, dash="dash"),
             )
         fig.update_layout(
             xaxis={"title": "Epoch"},
