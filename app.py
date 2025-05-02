@@ -275,16 +275,17 @@ if disease == INFLUENZA and predict and df is not None:
                 )
             )
 
-            # Add vertical lines for each date
-            for date in results_df["date"]:
-                fig1.add_shape(
-                    type="line",
-                    x0=date,
-                    y0=0,
-                    x1=date,
-                    y1=max(results_df["actual_data"].max(), results_df["predictions_upper"].max()) * 1.05,
-                    line=dict(color="black", width=1, dash="dash"),
-                )
+            # Add vertical lines for every other date (half as many lines)
+            for i, date in enumerate(results_df["date"]):
+                if i % 2 == 0:  # Only add lines for even-indexed dates (every other date)
+                    fig1.add_shape(
+                        type="line",
+                        x0=date,
+                        y0=0,
+                        x1=date,
+                        y1=max(results_df["actual_data"].max(), results_df["predictions_upper"].max()) * 1.05,
+                        line=dict(color="black", width=1, dash="dash"),
+                    )
             
             fig1.update_layout(
                 xaxis={"title": "Date", "tickangle": 45},
