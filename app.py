@@ -310,6 +310,20 @@ if disease == INFLUENZA and predict and df is not None:
             future_dates = [last_date + pd.Timedelta(weeks=i) for i in range(num_weeks + 1)]
             future_dates_str = [date.strftime('%Y-%m-%d') for date in future_dates]
             
+            # Generate intermediate dates for additional markers (halfway between each consecutive pair)
+            intermediate_dates = []
+            intermediate_dates_str = []
+            
+            for i in range(len(future_dates) - 1):
+                # Calculate the date halfway between consecutive dates
+                mid_date = future_dates[i] + pd.Timedelta(days=3.5)  # 3.5 days is half a week
+                intermediate_dates.append(mid_date)
+                intermediate_dates_str.append(mid_date.strftime('%Y-%m-%d'))
+            
+            # All dates for markers (original dates plus intermediate dates)
+            all_marker_dates_str = future_dates_str + intermediate_dates_str
+            all_marker_dates_str.sort()  # Sort to ensure proper ordering
+            
             forecast_values = [last_actual_value] + forecast["values"]
             upper_values = [last_actual_value] + forecast["upper_bounds"]
             lower_values = [last_actual_value] + forecast["lower_bounds"]
@@ -363,8 +377,8 @@ if disease == INFLUENZA and predict and df is not None:
                 )
             )
 
-            # Add vertical lines for each date
-            for date in future_dates_str:
+            # Add vertical lines for all dates (doubled frequency)
+            for date in all_marker_dates_str:
                 fig2.add_shape(
                     type="line",
                     x0=date,
